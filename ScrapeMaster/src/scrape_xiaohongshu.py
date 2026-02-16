@@ -11,15 +11,17 @@ from datetime import datetime
 from playwright.sync_api import sync_playwright
 import pandas as pd
 
-# 简化但有效的联系方式检测正则
+# 优化后的联系方式检测正则
 CONTACT_PATTERNS = {
     'wechat': [
-        r'(?:微信|微[信xX]|wx)[:：\s]*([a-zA-Z0-9_-]{5,20})',
-        r'加[我]?[微V][信xX][:：\s]*([a-zA-Z0-9_-]{5,20})',
+        r'(?:微信|微[信xX]|wx)[:：\s联系]*([a-zA-Z0-9_.-]{5,20})',
+        r'加[我]?[微V][信xX][:：\s]*([a-zA-Z0-9_.-]{5,20})',
+        r'微[信xX][:：\s]*([a-zA-Z0-9_.-]{5,20})',
     ],
     'phone': [
         r'\b(1[3-9]\d{9})\b',  # 中国手机号
         r'[电☎️📞]话[:：\s]*(\d{7,})',  # 电话关键词
+        r'手机[号]?[:：\s]*(\d{7,})',  # 手机号关键词
     ],
     'qq': [
         r'(?:QQ|qq|扣扣)[:：\s是]*(\d{5,11})',
