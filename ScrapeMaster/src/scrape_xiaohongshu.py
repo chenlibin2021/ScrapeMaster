@@ -11,27 +11,39 @@ from datetime import datetime
 from playwright.sync_api import sync_playwright
 import pandas as pd
 
-# 优化后的联系方式检测正则
+# 优化后的联系方式检测正则（专注常用联系方式）
 CONTACT_PATTERNS = {
     'wechat': [
-        r'(?:微信|微[信xX]|wx)[:：\s联系]*([a-zA-Z0-9_.-]{5,20})',
-        r'加[我]?[微V][信xX][:：\s]*([a-zA-Z0-9_.-]{5,20})',
-        r'微[信xX][:：\s]*([a-zA-Z0-9_.-]{5,20})',
+        # 微信 - 最常用的联系方式（支持中文ID）
+        r'(?:微信|微[信xX]|wx|wechat)[:：\s联系]*([a-zA-Z0-9_.\u4e00-\u9fa5-]{3,20})',
+        r'加[我]?[微V][信xX][:：\s]*([a-zA-Z0-9_.\u4e00-\u9fa5-]{3,20})',
+        r'微[信xX][:：\s]*([a-zA-Z0-9_.\u4e00-\u9fa5-]{3,20})',
+        r'扫码加[微V][信xX]?',
     ],
     'phone': [
-        r'\b(1[3-9]\d{9})\b',  # 中国手机号
-        r'[电☎️📞]话[:：\s]*(\d{7,})',  # 电话关键词
-        r'手机[号]?[:：\s]*(\d{7,})',  # 手机号关键词
-    ],
-    'qq': [
-        r'(?:QQ|qq|扣扣)[:：\s是]*(\d{5,11})',
-        r'(\d{5,11})@qq\.com',
-    ],
-    'email': [
-        r'([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})',
+        # 电话 - 中国手机号
+        r'\b(1[3-9]\d{9})\b',
+        # 电话 - 带格式（加拿大本地）
+        r'\b(\d{3}[-\s]?\d{3}[-\s]?\d{4})\b',
+        # 电话关键词
+        r'[电☎️📞]话[:：\s]*(\d{7,})',
+        # 手机号
+        r'手机[号]?[:：\s]*(\d{7,})',
     ],
     'whatsapp': [
-        r'(?:whatsapp|wa)[:：\s]*([+]\d{10,})',
+        # WhatsApp - 海外常用（避免与phone冲突）
+        r'(?:whatsapp|wa|WhatsApp)[:：\s]*([+]\d[\d\s-]{9,})(?!.*(?:电话|手机|phone))',
+        r'\bwhatsapp\b.*?([+]\d[\d\s-]{9,})',
+    ],
+    'email': [
+        # 邮箱 - 商务联系
+        r'([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})',
+        r'邮箱[:：\s]*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})',
+    ],
+    'instagram': [
+        # Instagram - 年轻用户常用
+        r'(?:ins|instagram|IG)[:：\s]*@?([a-zA-Z0-9_.]{1,30})',
+        r'@([a-zA-Z0-9_.]{1,30})(?=\s*(?:ins|instagram|IG|$))',
     ],
 }
 
@@ -50,29 +62,43 @@ def has_contact_info(text):
     return len(found_types) > 0, found_types
 
 def extract_contact_details(text):
-    """提取具体的联系方式"""
+    """提取具体的联系方式 - 优化版避免冲突"""
     if not text:
         return {}
     
     details = {}
-    for contact_type, patterns in CONTACT_PATTERNS.items():
+    
+    # 按优先级顺序处理，避免冲突
+    # 1. whatsapp优先（避免被误判为phone）
+    # 2. wechat
+    # 3. phone  
+    # 4. email
+    # 5. instagram
+    priority_order = ['whatsapp', 'wechat', 'phone', 'email', 'instagram']
+    
+    for contact_type in priority_order:
+        patterns = CONTACT_PATTERNS.get(contact_type, [])
         for pattern in patterns:
-            matches = re.findall(pattern, text, re.IGNORECASE)
-            if matches:
-                # 清理结果
-                clean_matches = []
-                for match in matches:
-                    if isinstance(match, tuple):
-                        for item in match:
-                            if item and item.strip():
-                                clean_matches.append(item.strip())
-                                break
-                    elif match and match.strip():
-                        clean_matches.append(match.strip())
-                
-                if clean_matches:
-                    details[contact_type] = clean_matches
-                    break
+            matches = re.finditer(pattern, text, re.IGNORECASE)
+            contact_matches = []
+            
+            for match in matches:
+                groups = match.groups()
+                if groups:
+                    for group in groups:
+                        if group and group.strip():
+                            cleaned = group.strip()
+                            if cleaned and cleaned not in contact_matches:
+                                contact_matches.append(cleaned)
+                            break
+                else:
+                    full_match = match.group(0).strip()
+                    if full_match and full_match not in contact_matches:
+                        contact_matches.append(full_match)
+            
+            if contact_matches:
+                details[contact_type] = contact_matches
+                break  # 找到一种模式就停止
     
     return details
 
