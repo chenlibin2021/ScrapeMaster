@@ -1,54 +1,53 @@
-#!/usr/bin/env python3
-"""
-小红书评论爬虫 - 专注抓取带联系方式的评论
-简化修复版
-"""
-import json
-import re
-import time
-import random
-from datetime import datetime
-from playwright.sync_api import sync_playwright
-import pandas as pd
-
-# 优化后的联系方式检测正则（专注常用联系方式）
-CONTACT_PATTERNS = {
-    'wechat': [
-        # 微信 - 最常用的联系方式（支持中文ID）
-        r'(?:微信|微[信xX]|wx|wechat)[:：\s联系]*([a-zA-Z0-9_.\u4e00-\u9fa5-]{2,30})',
-        r'加[我]?[微V][信xX][:：\s]*([a-zA-Z0-9_.\u4e00-\u9fa5-]{2,30})',
-        r'微[信xX][:：\s]*([a-zA-Z0-9_.\u4e00-\u9fa5-]{2,30})',
-        r'扫码加[微V][信xX]?',
-        r'\bwx[:：\s]*([a-zA-Z0-9_.\u4e00-\u9fa5-]{2,30})',
-        r'\bwechat[:：\s]*([a-zA-Z0-9_.\u4e00-\u9fa5-]{2,30})',
-    ],
-    'phone': [
-        # 电话 - 中国手机号
-        r'\b(1[3-9]\d{9})\b',
-        # 电话 - 带格式（加拿大本地）
-        r'\b(\d{3}[-\s]?\d{3}[-\s]?\d{4})\b',
-        # 电话关键词
-        r'[电☎️📞]话[:：\s]*(\d{3,})',
-        # 手机号
-        r'手机[号]?[:：\s]*(\d{3,})',
-        # 通用电话格式
-        r'\b\d{3}[-\s]?\d{3}[-\s]?\d{4}\b',
-        r'\b\d{10,11}\b',
-    ],
-    'whatsapp': [
-        # WhatsApp - 海外常用（避免与phone冲突）
-        r'(?:whatsapp|wa|WhatsApp)[:：\s联系]*([+]\d[\d\s-]{8,})',
-        r'\bwhatsapp\b.*?([+]\d[\d\s-]{8,})',
-        r'\bwa[:：\s]*([+]\d[\d\s-]{8,})',
-        r'WhatsApp联系[:：\s]*([+]\d[\d\s-]{8,})',
-    ],
-    'email': [
-        # 邮箱 - 商务联系
-        r'([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})',
-        r'邮箱[:：\s]*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})',
-        r'email[:：\s]*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})',
-    ],
-    'instagram': [
+# #!/usr/bin/env python3
+# """
+# 小红书评论爬虫 - 专注抓取带联系方式的评论
+# 简化修复版
+# """
+# import json
+# import re
+# import time
+# import random
+# from datetime import datetime
+# from playwright.sync_api import sync_playwright
+# import pandas as pd
+# 
+# # 优化后的联系方式检测正则（专注常用联系方式）
+# CONTACT_PATTERNS = {
+#     'wechat': [
+#         # 微信 - 最常用的联系方式（支持中文ID）
+#         r'(?:微信|微[信xX]|wx|wechat)[:：\s联系]*([a-zA-Z0-9_.\u4e00-\u9fa5-]{2,30})',
+#         r'加[我]?[微V][信xX][:：\s]*([a-zA-Z0-9_.\u4e00-\u9fa5-]{2,30})',
+#         r'微[信xX][:：\s]*([a-zA-Z0-9_.\u4e00-\u9fa5-]{2,30})',
+#         r'扫码加[微V][信xX]?',
+#         r'\bwx[:：\s]*([a-zA-Z0-9_.\u4e00-\u9fa5-]{2,30})',
+#         r'\bwechat[:：\s]*([a-zA-Z0-9_.\u4e00-\u9fa5-]{2,30})',
+#     ],
+#     'phone': [
+#         # 电话 - 中国手机号
+#         r'\b(1[3-9]\d{9})\b',
+#         # 电话 - 带格式（加拿大本地）
+#         r'\b(\d{3}[-\s]?\d{3}[-\s]?\d{4})\b',
+#         # 电话关键词
+#         r'[电☎️📞]话[:：\s]*(\d{3,})',
+#         # 手机号
+#         r'手机[号]?[:：\s]*(\d{3,})',
+#         # 通用电话格式
+#         r'\b\d{3}[-\s]?\d{3}[-\s]?\d{4}\b',
+#         r'\b\d{10,11}\b',
+#     ],
+#     'whatsapp': [
+#         # WhatsApp - 海外常用（避免与phone冲突）
+#         r'(?:whatsapp|wa|WhatsApp)[:：\s]*([+]\d[\d\s-]{8,})',
+#         r'\bwhatsapp\b.*?([+]\d[\d\s-]{8,})',
+#         r'\bwa[:：\s]*([+]\d[\d\s-]{8,})',
+#     ],
+#     'email': [
+#         # 邮箱 - 商务联系
+#         r'([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})',
+#         r'邮箱[:：\s]*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})',
+#         r'email[:：\s]*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})',
+#     ],
+#     'instagram': [
         # Instagram - 年轻用户常用
         r'(?:ins|instagram|IG)[:：\s]*@?([a-zA-Z0-9_.]{1,30})',
         r'@([a-zA-Z0-9_.]{1,30})(?=\s*(?:ins|instagram|IG|$))',
@@ -63,15 +62,11 @@ def has_contact_info(text):
         return False, []
     
     found_types = []
-    # 按优先级顺序检查，避免重复
-    priority_order = ['whatsapp', 'wechat', 'phone', 'email', 'instagram']
-    
-    for contact_type in priority_order:
-        patterns = CONTACT_PATTERNS.get(contact_type, [])
+    for contact_type, patterns in CONTACT_PATTERNS.items():
         for pattern in patterns:
             if re.search(pattern, text, re.IGNORECASE):
                 found_types.append(contact_type)
-                break  # 找到一种就停止
+                break
     
     return len(found_types) > 0, found_types
 

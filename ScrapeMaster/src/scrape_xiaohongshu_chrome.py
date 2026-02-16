@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-小红书评论爬虫 - 使用系统Chrome浏览器
-专注抓取带联系方式的评论，使用现有Chrome实例
+小红书评论爬虫 - 专注抓取带联系方式的评论
+简化修复版
 """
 import json
 import re
@@ -15,10 +15,12 @@ import pandas as pd
 CONTACT_PATTERNS = {
     'wechat': [
         # 微信 - 最常用的联系方式（支持中文ID）
-        r'(?:微信|微[信xX]|wx|wechat)[:：\s联系]*([a-zA-Z0-9_.\u4e00-\u9fa5-]{3,20})',
-        r'加[我]?[微V][信xX][:：\s]*([a-zA-Z0-9_.\u4e00-\u9fa5-]{3,20})',
-        r'微[信xX][:：\s]*([a-zA-Z0-9_.\u4e00-\u9fa5-]{3,20})',
+        r'(?:微信|微[信xX]|wx|wechat)[:：\s联系]*([a-zA-Z0-9_.\u4e00-\u9fa5-]{2,30})',
+        r'加[我]?[微V][信xX][:：\s]*([a-zA-Z0-9_.\u4e00-\u9fa5-]{2,30})',
+        r'微[信xX][:：\s]*([a-zA-Z0-9_.\u4e00-\u9fa5-]{2,30})',
         r'扫码加[微V][信xX]?',
+        r'\bwx[:：\s]*([a-zA-Z0-9_.\u4e00-\u9fa5-]{2,30})',
+        r'\bwechat[:：\s]*([a-zA-Z0-9_.\u4e00-\u9fa5-]{2,30})',
     ],
     'phone': [
         # 电话 - 中国手机号
@@ -26,24 +28,31 @@ CONTACT_PATTERNS = {
         # 电话 - 带格式（加拿大本地）
         r'\b(\d{3}[-\s]?\d{3}[-\s]?\d{4})\b',
         # 电话关键词
-        r'[电☎️📞]话[:：\s]*(\d{7,})',
+        r'[电☎️📞]话[:：\s]*(\d{3,})',
         # 手机号
-        r'手机[号]?[:：\s]*(\d{7,})',
+        r'手机[号]?[:：\s]*(\d{3,})',
+        # 通用电话格式
+        r'\b\d{3}[-\s]?\d{3}[-\s]?\d{4}\b',
+        r'\b\d{10,11}\b',
     ],
     'whatsapp': [
         # WhatsApp - 海外常用（避免与phone冲突）
-        r'(?:whatsapp|wa|WhatsApp)[:：\s]*([+]\d[\d\s-]{9,})(?!.*(?:电话|手机|phone))',
-        r'\bwhatsapp\b.*?([+]\d[\d\s-]{9,})',
+        r'(?:whatsapp|wa|WhatsApp)[:：\s]*([+]\d[\d\s-]{8,})',
+        r'\bwhatsapp\b.*?([+]\d[\d\s-]{8,})',
+        r'\bwa[:：\s]*([+]\d[\d\s-]{8,})',
     ],
     'email': [
         # 邮箱 - 商务联系
         r'([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})',
         r'邮箱[:：\s]*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})',
+        r'email[:：\s]*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})',
     ],
     'instagram': [
         # Instagram - 年轻用户常用
         r'(?:ins|instagram|IG)[:：\s]*@?([a-zA-Z0-9_.]{1,30})',
         r'@([a-zA-Z0-9_.]{1,30})(?=\s*(?:ins|instagram|IG|$))',
+        r'\bins[:：\s]*@?([a-zA-Z0-9_.]{1,30})',
+        r'\big[:：\s]*@?([a-zA-Z0-9_.]{1,30})',
     ],
 }
 
@@ -69,6 +78,11 @@ def extract_contact_details(text):
     details = {}
     
     # 按优先级顺序处理，避免冲突
+    # 1. whatsapp优先（避免被误判为phone）
+    # 2. wechat
+    # 3. phone  
+    # 4. email
+    # 5. instagram
     priority_order = ['whatsapp', 'wechat', 'phone', 'email', 'instagram']
     
     for contact_type in priority_order:
@@ -93,13 +107,13 @@ def extract_contact_details(text):
             
             if contact_matches:
                 details[contact_type] = contact_matches
-                break
+                break  # 找到一种模式就停止
     
     return details
 
-def scrape_sharon_comments_chrome(proxies=None, max_notes=None):
+def scrape_sharon_comments(proxies=None, max_notes=None):
     """
-    抓取Sharon多伦多地产的笔记评论 - 使用系统Chrome
+    抓取Sharon多伦多地产的笔记评论
     proxies: 代理列表
     max_notes: 最多抓取多少条笔记（None = 全部）
     """
@@ -107,123 +121,69 @@ def scrape_sharon_comments_chrome(proxies=None, max_notes=None):
     results = []
     
     with sync_playwright() as p:
-        print("🔗 尝试连接到系统Chrome浏览器...")
-        
+        # 启动浏览器（连接到已有的Chrome）
+        print("🔗 连接到Chrome浏览器...")
         try:
-            # 方法1：尝试连接到已运行的Chrome（通过Browser Relay）
             browser = p.chromium.connect_over_cdp("http://127.0.0.1:18792")
-            print("✅ 连接到已运行的Chrome浏览器（Browser Relay）")
-            
         except Exception as e:
-            print(f"❌ 无法连接到现有Chrome: {e}")
-            print("请确保：")
-            print("1. Chrome浏览器已打开")
-            print("2. 已安装OpenClaw Browser Relay扩展")
-            print("3. 在目标标签页点击了OpenClaw工具栏图标")
+            print(f"❌ 无法连接到Chrome: {e}")
+            print("请确保Chrome浏览器已打开并启用了Browser Relay")
             return results
         
+        context = browser.contexts[0]
+        page = context.pages[0]
+        
+        # 访问Sharon的主页
+        sharon_profile_url = "https://www.xiaohongshu.com/user/profile/59e2f0de153c3c1961a1deb4"
+        print(f"📍 访问 Sharon 主页...")
+        
         try:
-            context = browser.contexts[0]
-            page = context.pages[0] if context.pages else context.new_page()
-            
-            # 访问Sharon的主页
-            sharon_profile_url = "https://www.xiaohongshu.com/user/profile/59e2f0de153c3c1961a1deb4"
-            print(f"📍 访问 Sharon 主页: {sharon_profile_url}")
-            
             page.goto(sharon_profile_url, timeout=30000)
             time.sleep(3)
             
-            # 检查页面内容
-            page_title = page.title()
-            print(f"📄 页面标题: {page_title}")
-            
-            # 检查是否需要登录
-            page_content = page.content()
-            if "登录" in page_content or "login" in page_content.lower():
-                print("⚠️  检测到登录页面，小红书可能需要登录才能查看完整内容")
-                print("   请先手动登录小红书，然后重新运行爬虫")
-                return results
-            
             # 滚动加载更多笔记
             print("📜 滚动加载笔记列表...")
-            for i in range(3):  # 减少滚动次数，避免被封
+            for _ in range(5):
                 page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                 time.sleep(2)
-                print(f"   滚动 {i+1}/3 完成")
             
-            # 获取所有笔记链接（简化选择器）
+            # 获取所有笔记链接
             note_links = page.evaluate("""
                 () => {
                     const links = [];
-                    // 尝试多种选择器
-                    const selectors = [
-                        'a[href*="/explore/"]',
-                        'a[href*="/discovery/"]',
-                        '.note-item a',
-                        '[class*="note"] a'
-                    ];
-                    
-                    for (const selector of selectors) {
-                        const elements = document.querySelectorAll(selector);
-                        for (const el of elements) {
-                            const href = el.getAttribute('href');
-                            if (href && (href.includes('/explore/') || href.includes('/discovery/'))) {
-                                const fullUrl = href.startsWith('http') ? href : 'https://www.xiaohongshu.com' + href;
-                                if (!links.includes(fullUrl)) {
-                                    links.push(fullUrl);
-                                }
+                    const elements = document.querySelectorAll('a[href*="/explore/"]');
+                    elements.forEach(el => {
+                        const href = el.getAttribute('href');
+                        if (href && href.includes('/explore/')) {
+                            const fullUrl = href.startsWith('http') ? href : 'https://www.xiaohongshu.com' + href;
+                            if (!links.includes(fullUrl)) {
+                                links.push(fullUrl);
                             }
                         }
-                        if (links.length > 0) break;
-                    }
-                    
-                    return links.slice(0, 10);  # 限制数量
+                    });
+                    return links;
                 }
             """)
             
             print(f"✅ 找到 {len(note_links)} 条笔记")
             
-            if max_notes and len(note_links) > max_notes:
+            if max_notes:
                 note_links = note_links[:max_notes]
                 print(f"📌 限制为前 {max_notes} 条")
             
-            if not note_links:
-                print("⚠️  未找到笔记链接，可能：")
-                print("   1. 页面结构已变化")
-                print("   2. 需要登录才能查看")
-                print("   3. 反爬虫机制阻止")
-                return results
-            
             # 遍历每条笔记
             for idx, note_url in enumerate(note_links, 1):
-                print(f"\n[{idx}/{len(note_links)}] 处理笔记...")
+                print(f"\n[{idx}/{len(note_links)}] 处理笔记: {note_url}")
                 
                 try:
-                    # 在新标签页中打开笔记
-                    new_page = context.new_page()
-                    new_page.goto(note_url, timeout=30000)
+                    page.goto(note_url, timeout=30000)
                     time.sleep(3)
                     
                     # 获取笔记标题
-                    note_title = new_page.evaluate("""
+                    note_title = page.evaluate("""
                         () => {
-                            // 尝试多种标题选择器
-                            const selectors = [
-                                'h1',
-                                '.title',
-                                '[class*="title"]',
-                                '[class*="Title"]',
-                                'header h1',
-                                'header h2'
-                            ];
-                            
-                            for (const selector of selectors) {
-                                const el = document.querySelector(selector);
-                                if (el && el.innerText.trim()) {
-                                    return el.innerText.trim();
-                                }
-                            }
-                            return '无标题';
+                            const titleEl = document.querySelector('h1, .title, [class*="title"]');
+                            return titleEl ? titleEl.innerText : '无标题';
                         }
                     """) or "无标题"
                     
@@ -231,43 +191,38 @@ def scrape_sharon_comments_chrome(proxies=None, max_notes=None):
                     
                     # 滚动加载评论
                     print(f"  💬 加载评论...")
-                    for _ in range(2):  # 减少滚动
-                        new_page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                        time.sleep(2)
+                    for _ in range(3):
+                        page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                        time.sleep(1.5)
+                    
+                    # 点击"展开更多评论"按钮（如果有）
+                    try:
+                        expand_buttons = page.query_selector_all('button:has-text("展开"), button:has-text("更多")')
+                        for btn in expand_buttons[:3]:
+                            btn.click()
+                            time.sleep(1)
+                    except:
+                        pass
                     
                     # 提取评论
-                    comments = new_page.evaluate("""
+                    comments = page.evaluate("""
                         () => {
                             const comments = [];
-                            // 尝试多种评论选择器
-                            const selectors = [
-                                '[class*="comment"]',
-                                '[class*="Comment"]',
-                                '.note-item',
-                                '.comment-item',
-                                '.comment-list li',
-                                '.comment-content'
-                            ];
+                            const commentEls = document.querySelectorAll('[class*="comment"], .note-item, [class*="Comment"]');
                             
-                            for (const selector of selectors) {
-                                const elements = document.querySelectorAll(selector);
-                                if (elements.length > 0) {
-                                    elements.forEach(el => {
-                                        const userEl = el.querySelector('[class*="user"], [class*="name"], .author, .username');
-                                        const contentEl = el.querySelector('[class*="content"], [class*="text"], p, .text, .comment-text');
-                                        const timeEl = el.querySelector('[class*="time"], [class*="date"], time, .timestamp');
-                                        
-                                        if (contentEl && contentEl.innerText.trim()) {
-                                            comments.push({
-                                                user: userEl ? userEl.innerText.trim() : '未知用户',
-                                                content: contentEl.innerText.trim(),
-                                                time: timeEl ? timeEl.innerText.trim() : ''
-                                            });
-                                        }
+                            commentEls.forEach(el => {
+                                const userEl = el.querySelector('[class*="user"], [class*="name"], .author');
+                                const contentEl = el.querySelector('[class*="content"], [class*="text"], p');
+                                const timeEl = el.querySelector('[class*="time"], [class*="date"], time');
+                                
+                                if (contentEl && contentEl.innerText.trim()) {
+                                    comments.push({
+                                        user: userEl ? userEl.innerText.trim() : '未知用户',
+                                        content: contentEl.innerText.trim(),
+                                        time: timeEl ? timeEl.innerText.trim() : ''
                                     });
-                                    break;
                                 }
-                            }
+                            });
                             
                             return comments;
                         }
@@ -300,13 +255,8 @@ def scrape_sharon_comments_chrome(proxies=None, max_notes=None):
                     else:
                         print(f"  ⚠️  未发现包含联系方式的评论")
                     
-                    # 关闭标签页
-                    new_page.close()
-                    
-                    # 随机延迟
-                    delay = random.uniform(4, 8)
-                    print(f"  ⏳ 等待 {delay:.1f} 秒后继续...")
-                    time.sleep(delay)
+                    # 随机延迟，避免被封
+                    time.sleep(random.uniform(2, 4))
                     
                 except Exception as e:
                     print(f"  ❌ 处理笔记出错: {e}")
@@ -317,51 +267,33 @@ def scrape_sharon_comments_chrome(proxies=None, max_notes=None):
         
         finally:
             print("\n🏁 抓取完成")
-            # 不关闭浏览器，让用户继续使用
     
     return results
 
 def main():
     print("=" * 60)
-    print("小红书评论爬虫 - 系统Chrome版本")
-    print("目标：抓取Sharon多伦多地产的评论（使用现有Chrome浏览器）")
-    print("=" * 60)
-    
-    print("\n⚠️  重要提示：")
-    print("1. 请先打开Chrome浏览器")
-    print("2. 安装OpenClaw Browser Relay扩展")
-    print("3. 访问小红书并登录（如果需要）")
-    print("4. 在小红书页面点击OpenClaw工具栏图标")
+    print("小红书评论爬虫 - Sharon多伦多地产")
+    print("目标：抓取包含联系方式的评论")
     print("=" * 60)
     
     # 加载代理（可选）
     proxies = None
     try:
-        with open('data/working_proxies.json', 'r') as f:
+        with open('/home/chenlibin/.openclaw/workspace/working_proxies.json', 'r') as f:
             proxy_data = json.load(f)
             proxies = [p['proxy'] for p in proxy_data]
             print(f"✅ 加载了 {len(proxies)} 个代理")
     except:
         print("⚠️  未找到代理配置，使用当前网络")
     
-    # 设置抓取数量
-    max_notes = 3  # 测试模式，少量笔记
-    print(f"\n🚀 开始测试抓取...")
-    print(f"📌 最多抓取 {max_notes} 条笔记（测试模式）")
-    
-    input("按Enter键开始抓取（确保Chrome已连接）...")
-    
-    # 开始抓取
-    results = scrape_sharon_comments_chrome(
-        proxies=proxies, 
-        max_notes=max_notes
-    )
+    # 开始抓取（先测试5条笔记）
+    print("\n🚀 开始抓取（测试模式：前10条笔记）...")
+    results = scrape_sharon_comments(proxies=proxies, max_notes=10)
     
     if results:
         # 保存为Excel
         df = pd.DataFrame(results)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_file = f'sharon_comments_chrome_{timestamp}.xlsx'
+        output_file = f'/home/chenlibin/.openclaw/workspace/sharon_comments_with_contacts_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
         
         df.to_excel(output_file, index=False, engine='openpyxl')
         
@@ -379,24 +311,8 @@ def main():
         print("\n📈 联系方式分布:")
         for ctype, count in sorted(contact_type_counts.items(), key=lambda x: x[1], reverse=True):
             print(f"  - {ctype}: {count} 条")
-        
-        # 显示示例
-        print("\n📋 示例结果:")
-        for i, r in enumerate(results[:2], 1):
-            print(f"\n示例 {i}:")
-            print(f"  用户: {r['用户名']}")
-            print(f"  内容: {r['评论内容'][:60]}...")
-            print(f"  类型: {r['联系方式类型']}")
-            details = json.loads(r['提取的联系方式'])
-            for ctype, values in details.items():
-                print(f"  {ctype}: {', '.join(values[:2])}")
     else:
         print("\n⚠️  未找到包含联系方式的评论")
-        print("可能的原因:")
-        print("1. 小红书需要登录才能查看完整内容")
-        print("2. 该博主没有包含联系方式的评论")
-        print("3. Chrome浏览器未正确连接")
-        print("4. 页面结构已变化，需要更新选择器")
 
 if __name__ == "__main__":
     main()

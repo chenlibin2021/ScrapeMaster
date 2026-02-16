@@ -1,0 +1,17 @@
+[
+  {
+    "proxy": "http://72.56.59.17:61931",
+    "working": true,
+    "response_time": 0.784709
+  },
+  {
+    "proxy": "http://72.56.50.17:59787",
+    "working": true,
+    "response_time": 1.051206
+  },
+  {
+    "proxy": "http://104.238.30.91:63900",
+    "working": true,
+    "response_time": 3.894298
+  }
+]
