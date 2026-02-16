@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Data files
+*.xlsx
+*.csv
+*.json (except config)
+!data/working_proxies.json
+scrapemaster.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test files (temporary)
+test_fixes.py
+fix_qq_detection.py
+final_fix.py
+simple_fix.py
+test_crawler_logic.py
+
+# Workspace files (outside project)
+../MEMORY.md
+../memory/
+../browser_snapshot.txt
