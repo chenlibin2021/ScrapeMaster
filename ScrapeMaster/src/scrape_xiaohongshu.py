@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 小红书评论爬虫 - 专注抓取带联系方式的评论
+简化修复版
 """
 import json
 import re
@@ -10,31 +11,25 @@ from datetime import datetime
 from playwright.sync_api import sync_playwright
 import pandas as pd
 
-# 联系方式检测正则
+# 简化但有效的联系方式检测正则
 CONTACT_PATTERNS = {
     'wechat': [
-        r'[微V信][信xX][:：\s]*([a-zA-Z0-9_-]{5,20})',
-        r'wx[:：\s]*([a-zA-Z0-9_-]{5,20})',
-        r'加我?[微V][信xX]',
-        r'扫码加[微V]',
+        r'(?:微信|微[信xX]|wx)[:：\s]*([a-zA-Z0-9_-]{5,20})',
+        r'加[我]?[微V][信xX][:：\s]*([a-zA-Z0-9_-]{5,20})',
     ],
     'phone': [
-        r'(\d{3}[-\s]?\d{3}[-\s]?\d{4})',  # 北美电话
-        r'(\d{3}[-\s]?\d{4}[-\s]?\d{4})',  # 中国电话
-        r'[电☎️📞]话[:：\s]*(\d[\d\s-]{7,})',
+        r'\b(1[3-9]\d{9})\b',  # 中国手机号
+        r'[电☎️📞]话[:：\s]*(\d{7,})',  # 电话关键词
     ],
     'qq': [
-        r'QQ[:：\s]*(\d{5,11})',
-        r'qq[:：\s]*(\d{5,11})',
-        r'扣扣[:：\s]*(\d{5,11})',
-        r'(?<=QQ|qq|扣扣)[:：\s]*(\d{5,11})',
+        r'(?:QQ|qq|扣扣)[:：\s是]*(\d{5,11})',
+        r'(\d{5,11})@qq\.com',
     ],
     'email': [
         r'([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})',
     ],
     'whatsapp': [
-        r'whatsapp[:：\s]*([+]\d[\d\s-]{9,})(?!.*电话)',
-        r'wa[:：\s]*([+]\d[\d\s-]{9,})',
+        r'(?:whatsapp|wa)[:：\s]*([+]\d{10,})',
     ],
 }
 
@@ -54,17 +49,30 @@ def has_contact_info(text):
 
 def extract_contact_details(text):
     """提取具体的联系方式"""
-    contacts = {}
+    if not text:
+        return {}
     
+    details = {}
     for contact_type, patterns in CONTACT_PATTERNS.items():
         for pattern in patterns:
             matches = re.findall(pattern, text, re.IGNORECASE)
             if matches:
-                if contact_type not in contacts:
-                    contacts[contact_type] = []
-                contacts[contact_type].extend(matches)
+                # 清理结果
+                clean_matches = []
+                for match in matches:
+                    if isinstance(match, tuple):
+                        for item in match:
+                            if item and item.strip():
+                                clean_matches.append(item.strip())
+                                break
+                    elif match and match.strip():
+                        clean_matches.append(match.strip())
+                
+                if clean_matches:
+                    details[contact_type] = clean_matches
+                    break
     
-    return contacts
+    return details
 
 def scrape_sharon_comments(proxies=None, max_notes=None):
     """
