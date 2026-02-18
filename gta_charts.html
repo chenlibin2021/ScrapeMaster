@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>大多伦多地区地产数据图表</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .chart-container {
+            margin: 30px 0;
+            padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.1);
+        }
+        .chart-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #2c3e50;
+            text-align: center;
+        }
+        .chart-wrapper {
+            position: relative;
+            height: 400px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .stat-card h3 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .stat-card .change {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .download-btn {
+            display: block;
+            width: 200px;
+            margin: 30px auto;
+            padding: 12px 24px;
+            background: #4CAF50;
+            color: white;
+            text-align: center;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏠 大多伦多地区地产市场数据 - 2026年2月</h1>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>平均房价</h3>
+                <div class="value">$973,289</div>
+                <div class="change">同比下降 6.5%</div>
+                <div class="note">5年来首次跌破百万</div>
+            </div>
+            <div class="stat-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                <h3>房屋销售量</h3>
+                <div class="value">3,082套</div>
+                <div class="change">同比下降 19.3%</div>
+                <div class="note">市场活跃度降低</div>
+            </div>
+            <div class="stat-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                <h3>平均挂牌天数</h3>
+                <div class="value">45天</div>
+                <div class="change">增加 21.6%</div>
+                <div class="note">销售周期延长</div>
+            </div>
+            <div class="stat-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                <h3>活跃挂牌量</h3>
+                <div class="value">17,975套</div>
+                <div class="change">增加 8.1%</div>
+                <div class="note">供应压力增大</div>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <div class="chart-title">📊 GTA平均房价对比 (2025 vs 2026)</div>
+            <div class="chart-wrapper">
+                <canvas id="priceChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <div class="chart-title">🏢 不同类型房产价格表现</div>
+            <div class="chart-wrapper">
+                <canvas id="propertyTypeChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <div class="chart-title">📉 GTA房价变化趋势 (2022峰值 vs 2026)</div>
+            <div class="chart-wrapper">
+                <canvas id="trendChart"></canvas>
+            </div>
+        </div>
+
+        <a href="#" class="download-btn" onclick="downloadCharts()">📥 下载所有图表</a>
+    </div>
+
+    <script>
+        // 图表1：房价对比
+        const priceCtx = document.getElementById('priceChart').getContext('2d');
+        new Chart(priceCtx, {
+            type: 'bar',
+            data: {
+                labels: ['2025年1月', '2026年1月'],
+                datasets: [{
+                    label: '平均房价 (万加元)',
+                    data: [104.1, 97.3],
+                    backgroundColor: ['#4CAF50', '#F44336'],
+                    borderColor: ['#388E3C', '#D32F2F'],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        min: 90,
+                        title: {
+                            display: true,
+                            text: '万加元'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                }
+            }
+        });
+
+        // 图表2：房产类型
+        const typeCtx = document.getElementById('propertyTypeChart').getContext('2d');
+        new Chart(typeCtx, {
+            type: 'bar',
+            data: {
+                labels: ['独立屋', '公寓'],
+                datasets: [{
+                    label: '平均价格 (万加元)',
+                    data: [127.8, 60.5],
+                    backgroundColor: ['#9C27B0', '#00BCD4'],
+                    borderColor: ['#7B1FA2', '#0097A7'],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: '万加元'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                }
+            }
+        });
+
+        // 图表3：价格趋势
+        const trendCtx = document.getElementById('trendChart').getContext('2d');
+        new Chart(trendCtx, {
+            type: 'bar',
+            data: {
+                labels: ['2022年2月峰值', '2026年1月'],
+                datasets: [{
+                    label: '平均房价 (万加元)',
+                    data: [133.3, 97.3],
+                    backgroundColor: ['#FF5722', '#3F51B5'],
+                    borderColor: ['#E64A19', '#303F9F'],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: '万加元'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                }
+            }
+        });
+
+        function downloadCharts() {
+            alert('图表已准备就绪！您可以使用浏览器截图功能保存图表。\n\n快捷键：\n- Windows/Linux: Ctrl+Shift+S\n- Mac: Cmd+Shift+4');
+        }
+    </script>
+</body>
+</html>

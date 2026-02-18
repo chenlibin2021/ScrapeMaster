@@ -124,7 +124,7 @@ def scrape_sharon_comments(proxies=None, max_notes=None):
         # 启动浏览器（连接到已有的Chrome）
         print("🔗 连接到Chrome浏览器...")
         try:
-            browser = p.chromium.connect_over_cdp("http://127.0.0.1:18792")
+            browser = p.chromium.connect_over_cdp("ws://127.0.0.1:18792/cdp")
         except Exception as e:
             print(f"❌ 无法连接到Chrome: {e}")
             print("请确保Chrome浏览器已打开并启用了Browser Relay")

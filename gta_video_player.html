@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>大多伦多地产新闻 - 视频播报</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .video-container {
+            width: 100%;
+            max-width: 1200px;
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        .video-header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .video-header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        
+        .video-header .subtitle {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .video-content {
+            display: flex;
+            min-height: 600px;
+        }
+        
+        .slides-container {
+            flex: 3;
+            background: #f8f9fa;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+        
+        .slide.active {
+            opacity: 1;
+        }
+        
+        .slide-title {
+            font-size: 2.2em;
+            color: #2c3e50;
+            margin-bottom: 30px;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .slide-content {
+            font-size: 1.4em;
+            line-height: 1.6;
+            color: #34495e;
+            max-width: 800px;
+            text-align: center;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-top: 30px;
+            width: 100%;
+            max-width: 800px;
+        }
+        
+        .stat-item {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            text-align: center;
+            border-left: 5px solid #3498db;
+        }
+        
+        .stat-item.highlight {
+            border-left-color: #e74c3c;
+            background: linear-gradient(135deg, #fff5f5 0%, #ffeaea 100%);
+        }
+        
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 10px 0;
+        }
+        
+        .stat-label {
+            font-size: 1.1em;
+            color: #7f8c8d;
+        }
+        
+        .stat-change {
+            font-size: 1em;
+            color: #e74c3c;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        
+        .audio-controls {
+            flex: 1;
+            background: #2c3e50;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .audio-player {
+            width: 100%;
+            max-width: 300px;
+        }
+        
+        .play-btn {
+            width: 80px;
+            height: 80px;
+            background: #3498db;
+            border-radius: 50%;
+            border: none;
+            color: white;
+            font-size: 1.5em;
+            cursor: pointer;
+            margin-bottom: 30px;
+            transition: all 0.3s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .play-btn:hover {
+            background: #2980b9;
+            transform: scale(1.1);
+        }
+        
+        .play-btn.playing {
+            background: #e74c3c;
+        }
+        
+        .progress-container {
+            width: 100%;
+            height: 10px;
+            background: #34495e;
+            border-radius: 5px;
+            margin: 20px 0;
+            overflow: hidden;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background: #3498db;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+        
+        .time-display {
+            color: white;
+            font-size: 1.2em;
+            margin: 10px 0;
+            text-align: center;
+        }
+        
+        .controls-info {
+            color: #bdc3c7;
+            text-align: center;
+            margin-top: 30px;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+        
+        .slide-indicators {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        .indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: rgba(52, 152, 219, 0.3);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .indicator.active {
+            background: #3498db;
+            transform: scale(1.2);
+        }
+        
+        .video-footer {
+            background: #ecf0f1;
+            padding: 20px;
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+        
+        @media (max-width: 768px) {
+            .video-content {
+                flex-direction: column;
+            }
+            
+            .slides-container {
+                min-height: 400px;
+            }
+            
+            .slide-title {
+                font-size: 1.8em;
+            }
+            
+            .slide-content {
+                font-size: 1.2em;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="video-container">
+        <div class="video-header">
+            <h1>🏠 大多伦多地区地产新闻</h1>
+            <div class="subtitle">2026年2月市场深度分析报告</div>
+        </div>
+        
+        <div class="video-content">
+            <div class="slides-container">
+                <!-- 幻灯片1：开场 -->
+                <div class="slide active" id="slide1">
+                    <div class="slide-title">📊 市场重要转折点</div>
+                    <div class="slide-content">
+                        2026年2月，大多伦多地区房地产市场迎来历史性时刻——<br>
+                        <strong>五年来首次，平均房价跌破百万加元大关</strong>
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-item highlight">
+                            <div class="stat-value">$973,289</div>
+                            <div class="stat-label">2026年1月平均房价</div>
+                            <div class="stat-change">同比下降 6.5%</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">5年</div>
+                            <div class="stat-label">首次跌破百万</div>
+                            <div class="stat-change">自2021年1月以来</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 幻灯片2：市场表现 -->
+                <div class="slide" id="slide2">
+                    <div class="slide-title">📉 市场表现分析</div>
+                    <div class="slide-content">
+                        销量大幅下滑，市场活跃度显著降低，<br>
+                        供应压力持续增大
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-value">3,082套</div>
+                            <div class="stat-label">房屋销售量</div>
+                            <div class="stat-change">同比下降 19.3%</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">45天</div>
+                            <div class="stat-label">平均挂牌天数</div>
+                            <div class="stat-change">增加 21.6%</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">17,975套</div>
+                            <div class="stat-label">活跃挂牌量</div>
+                            <div class="stat-change">增加 8.1%</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">25年</div>
+                            <div class="stat-label">成交量新低</div>
+                            <div class="stat-change">历史最低水平</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 幻灯片3：房产类型 -->
+                <div class="slide" id="slide3">
+                    <div class="slide-title">🏢 不同类型房产表现</div>
+                    <div class="slide-content">
+                        市场调整中，不同类型房产表现分化明显，<br>
+                        公寓市场面临更大压力
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-value">$1,277,915</div>
+                            <div class="stat-label">独立屋平均价格</div>
+                            <div class="stat-change">同比下降 7.4%</div>
+                        </div>
+                        <div class="stat-item highlight">
+                            <div class="stat-value">$604,759</div>
+                            <div class="stat-label">公寓平均价格</div>
+                            <div class="stat-change">同比下降 9.8%</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">13%</div>
+                            <div class="stat-label">905地区公寓跌幅</div>
+                            <div class="stat-change">年跌幅最大区域</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">27%</div>
+                            <div class="stat-label">较峰值下跌</div>
+                            <div class="stat-change">自2022年2月峰值</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 幻灯片4：市场因素 -->
+                <div class="slide" id="slide4">
+                    <div class="slide-title">🌍 市场影响因素</div>
+                    <div class="slide-content">
+                        多重因素共同作用，影响市场信心和决策
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-value">2.25%</div>
+                            <div class="stat-label">央行政策利率</div>
+                            <div class="stat-change">从3.25%下降</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">22%</div>
+                            <div class="stat-label">计划购房比例</div>
+                            <div class="stat-change">较2025年下降</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">贸易</div>
+                            <div class="stat-label">美加关系紧张</div>
+                            <div class="stat-change">关税威胁影响</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">人口</div>
+                            <div class="stat-label">临时居民减少</div>
+                            <div class="stat-change">影响租赁市场</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 幻灯片5：专家观点 -->
+                <div class="slide" id="slide5">
+                    <div class="slide-title">💬 专家观点与展望</div>
+                    <div class="slide-content">
+                        TRREB主席Daniel Steinfeld表示：<br>
+                        <em>"经济前景更清晰可能恢复买家信心"</em>
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-value">上半年</div>
+                            <div class="stat-label">持续调整期</div>
+                            <div class="stat-change">价格销售疲软</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">下半年</div>
+                            <div class="stat-label">寻找平衡点</div>
+                            <div class="stat-change">可能趋于稳定</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">买家</div>
+                            <div class="stat-label">等待明确方向</div>
+                            <div class="stat-change">信心逐步恢复</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">卖家</div>
+                            <div class="stat-label">信心相对不足</div>
+                            <div class="stat-change">谨慎观望</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 幻灯片6：总结 -->
+                <div class="slide" id="slide6">
+                    <div class="slide-title">🎯 总结与展望</div>
+                    <div class="slide-content">
+                        尽管短期面临挑战，但大多伦多地区<br>
+                        长期人口增长基本面仍支撑住房需求
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-value">调整期</div>
+                            <div class="stat-label">市场健康修正</div>
+                            <div class="stat-change">价格回归合理</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">可负担性</div>
+                            <div class="stat-label">逐步改善</div>
+                            <div class="stat-change">利率价格双降</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">基本面</div>
+                            <div class="stat-label">长期支撑</div>
+                            <div class="stat-change">人口持续增长</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">2026</div>
+                            <div class="stat-label">关键转折年</div>
+                            <div class="stat-change">市场寻找新平衡</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="slide-indicators">
+                    <div class="indicator active" data-slide="1"></div>
+                    <div class="indicator" data-slide="2"></div>
+                    <div class="indicator" data-slide="3"></div>
+                    <div class="indicator" data-slide="4"></div>
+                    <div class="indicator" data-slide="5"></div>
+                    <div class="indicator" data-slide="6"></div>
+                </div>
+            </div>
+            
+            <div class="audio-controls">
+                <button class="play-btn" id="playBtn">▶</button>
+                
+                <div class="progress-container">
+                    <div class="progress-bar" id="progressBar"></div>
+                </div>
+                
+                <div class="time-display">
+                    <span id="currentTime">0:00</span> / <span id="totalTime">3:00</span>
+                </div>
+                
+                <div class="controls-info">
+                    <p>🎧 点击播放按钮开始播报</p>
+                    <p>📊 幻灯片会自动同步切换</p>
+                    <p>⏸️ 可随时暂停/继续</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="video-footer">
+            数据来源：多伦多地产局(TRREB) | 报告时间：2026年2月16日 | 本报告仅供参考
+        </div>
+    </div>
+
+    <script>
+        // 音频处理
+        const audio = new Audio('/tmp/tts-BzFCew/voice-1771300253279.mp3');
+        const playBtn = document.getElementById('playBtn');
+        const progressBar = document.getElementById('progressBar');
+        const currentTimeEl = document.getElementById('currentTime');
+        const totalTimeEl = document.getElementById('totalTime');
+        
+        // 幻灯片元素
+        const slides = document.querySelectorAll('.slide');
+        const indicators = document.querySelectorAll('.indicator');
+        let currentSlide = 0;
+        
+        // 格式化时间显示
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+        
+        // 更新进度条
+        function updateProgress() {
+            const progress = (audio.currentTime / audio.duration) * 100;
+            progressBar.style.width = `${progress}%`;
+            currentTimeEl.textContent = formatTime(audio.currentTime);
+            
+            // 根据时间切换幻灯片
+            const slideDuration = audio.duration / slides.length;
+            const newSlide = Math.floor(audio.currentTime / slideDuration);
+            
+            if (newSlide !== currentSlide && newSlide < slides.length) {
+                changeSlide(newSlide);
+            }
+        }
+        
+        // 切换幻灯片
+        function changeSlide(slideIndex) {
+            // 移除当前活动状态
+            slides[currentSlide].classList.remove('active');
+            indicators[currentSlide].classList.remove('active');
+            
+            // 设置新的活动状态
+            currentSlide = slideIndex;
+            slides[currentSlide].classList.add('active');
+            indicators[currentSlide].classList.add('active');
+        }
+        
+        // 点击指示器切换幻灯片
+        indicators.forEach((indicator, index) => {
+            indicator.addEventListener('click', () => {
+                if (audio.paused) {
+                    changeSlide(index);
+                } else {
+                    // 如果正在播放，跳转到对应时间
+                    const slideDuration = audio.duration / slides.length;
+                    audio.currentTime = index * slideDuration;
+                    changeSlide(index);
+                }
+            });
+        });
+        
+        // 播放/暂停控制
+        playBtn.addEventListener('click', () => {
+            if (audio.paused) {
+                audio.play();
+                playBtn.textContent = '⏸';
+                playBtn.classList.add('playing');
+            } else {
+                audio.pause();
+                playBtn.textContent = '▶';
+                playBtn.classList.remove('playing');
+            }
+        });
+        
+        // 音频加载完成
+        audio.addEventListener('loadedmetadata', () => {
+            totalTimeEl.textContent = formatTime(audio.duration);
+        });
+        
+        // 音频时间更新
+        audio.addEventListener('timeupdate', updateProgress);
+        
+        // 音频结束
+        audio.addEventListener('ended', () => {
+            playBtn.textContent = '▶';
+            playBtn.classList.remove('playing');
+            progressBar.style.width = '0%';
+            currentTimeEl.textContent = '0:00';
+            changeSlide(0); // 回到第一张幻灯片
+        });
+        
+        // 初始化
+        audio.load();
+        
+        // 自动播放检查（需要用户交互）
+        document.addEventListener('click', () => {
+            if (audio.paused) {
+                // 在用户第一次点击后可以自动播放
+                audio.play().catch(e => console.log('自动播放被阻止:', e));
+            }
+        }, { once: true });
+        
+        // 键盘控制
+        document.addEventListener('keydown', (e) => {
+            switch(e.key) {
+                case ' ':
+                case 'Spacebar':
+                    e.preventDefault();
+                    playBtn.click();
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    const nextSlide = (currentSlide + 1) % slides.length;
+                    changeSlide(nextSlide);
+                    const slideDuration = audio.duration / slides.length;
+                    audio.currentTime = nextSlide * slideDuration;
+                    break;
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    const prevSlide = (currentSlide - 1 + slides.length) % slides.length;
+                    changeSlide(prevSlide);
+                    const slideDur = audio.duration / slides.length;
+                    audio.currentTime = prevSlide * slideDur;
+                    break;
+            }
+        });
+        
+        // 添加触摸滑动支持
+        let touchStartX = 0;
+        let touchEndX = 0;
+        
+        document.querySelector('.slides-container').addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+        });
+        
+        document.querySelector('.slides-container').addEventListener('touchend', (e) => {
+            touchEndX = e.changedTouches[0].screenX;
+            handleSwipe();
+        });
+        
+        function handleSwipe() {
+            const swipeThreshold = 50;
+            const diff = touchStartX - touchEndX;
+            
+            if (Math.abs(diff) > swipeThreshold) {
+                if (diff > 0) {
+                    // 向左滑动 - 下一张
+                    const nextSlide = (currentSlide + 1) % slides.length;
+                    changeSlide(nextSlide);
+                    const slideDuration = audio.duration / slides.length;
+                    audio.currentTime = nextSlide * slideDuration;
+                } else {
+                    // 向右滑动 - 上一张
+                    const prevSlide = (currentSlide - 1 + slides.length) % slides.length;
+                    changeSlide(prevSlide);
+                    const slideDuration = audio.duration / slides.length;
+                    audio.currentTime = prevSlide * slideDuration;
+                }
+            }
+        }
+        
+        // 添加导出功能
+        function exportAsVideo() {
+            alert('视频导出功能需要服务器端处理。\n\n替代方案：\n1. 使用屏幕录制软件录制此页面\n2. 使用OBS Studio进行专业录制\n3. 使用浏览器开发者工具录制\n\n推荐使用OBS Studio（免费专业软件）');
+        }
+        
+        // 添加导出按钮
+        const exportBtn = document.createElement('button');
+        exportBtn.textContent = '📥 导出视频';
+        exportBtn.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+            z-index: 1000;
+        `;
+        exportBtn.onclick = exportAsVideo;
+        document.body.appendChild(exportBtn);
+        
+        console.log('🎬 大多伦多地产新闻视频播放器已加载完成！');
+        console.log('使用说明：');
+        console.log('1. 点击播放按钮开始播报');
+        console.log('2. 使用左右箭头键切换幻灯片');
+        console.log('3. 点击底部圆点直接跳转');
+        console.log('4. 在手机上可以左右滑动切换');
+        console.log('5. 点击右下角按钮获取导出指南');
